@@ -1,0 +1,11 @@
+# job-match-priority 配置文件
+# 将此文件复制为 config.local.yaml 并填入你的 API Key
+# ⚠️ 不要将 config.local.yaml 提交到 Git
+
+# SiliconFlow API 配置（用于语义 embedding）
+siliconflow:
+  api_key: ""  # 填入你的 SiliconFlow API Key
+  model: "BAAI/bge-large-zh-v1.5"  # 推荐模型
+
+# 默认运行模式: keyword / light-embed / api-embed
+default_mode: "api-embed"

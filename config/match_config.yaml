@@ -1,0 +1,241 @@
+# job-match-priority 编译后的规则配置
+# 由 Agent 在「首次使用」时一次性编译生成（或人工微调）。
+# 纯 Python 引擎 matcher.py 直接消费本文件，不再调用任何 LLM。
+# 不同候选人只需替换 candidate_profile.json，本文件可完全复用。
+
+scoring:
+  weight_first: 12        # 第 1 条能力条目权重
+  weight_second: 10       # 第 2 条能力条目权重
+  weight_rest: 6          # 第 3 条及之后权重
+  min_items: 3            # JD 能力条目不足时尽力补齐的下限
+  max_items: 5            # JD 能力条目上限（取前 N 条）
+  thresholds:
+    high: 95              # 匹配度 >= 95 -> high
+    medium: 90            # 90 <= 匹配度 < 95 -> medium；< 90 -> low
+
+depth_coefficient:
+  ge: 1.0                 # 候选人深度 >= JD 要求
+  minus1: 0.5             # 低 1 级
+  minus2plus: 0.0         # 低 2 级及以上
+
+# JD 能力条目 -> KSAO 子维度 归类对照表（关键词命中即归类）
+taxonomy:
+  - dimension: 战略能力
+    keywords: [战略, 经营规划, 决策支持, 经营分析, 战略规划, 战略拆解]
+  - dimension: 目标与绩效管理
+    keywords: [OKR, KPI, 绩效管理, 目标拆解, 绩效考核, 目标管理]
+  - dimension: 组织能力_体系搭建
+    keywords: [组织发展, 职级体系, 人才盘点, 制度体系, 体系搭建, 制度制定]
+  - dimension: 招聘与配置
+    keywords: [负责招聘, 统筹招聘, 招聘全流程, 招聘管理, 人才招聘, 猎头管理, 招聘渠道, 面试甄选, 人才选拔, 招聘体系, 校园招聘, 社会招聘]
+  - dimension: 薪酬福利
+    keywords: [薪酬核算, 薪酬体系, 薪资设计, 薪酬管理, C&B, 福利管理, 社保公积金, 五险一金, 薪酬方案, 调薪]
+  - dimension: 组织能力_人才发展
+    keywords: [培训, 团建, 企业文化, 员工发展, 人才培养]
+  - dimension: 数据能力
+    keywords: [数据看板, 数据分析, BI报表, 经营分析, 数据驱动, 人力数据, 数据报表, 搭建看板]
+  - dimension: AI与自动化
+    keywords: [AI, 人工智能, 自动化, RPA, 智能体, Agent, 大模型, 数字化]
+  - dimension: 飞书生态
+    keywords: [飞书, 多维表格, 飞书审批, 飞书OKR, 钉钉, 企业微信]
+  - dimension: 项目与流程管理
+    keywords: [项目管理, 流程优化, 跨部门协调, 流程再造, 项目统筹, 流程体系, SOP, 标准化体系]
+  - dimension: 助理职能
+    keywords: [会议管理, 日程安排, 文件起草, 商务接待, 汇报材料, 纪要撰写, 差旅安排, 高管日程, 行程管理, 会议纪要, 公文起草]
+  - dimension: 员工关系
+    keywords: [劳动关系, 员工关系, 入转调离, 用工风险]
+  - dimension: 商务公关
+    keywords: [商务洽谈, 商务接待, 政府对接, 政企关系, 外联, 投标招标, 商务谈判, 品牌推广, 媒体关系]
+  - dimension: 销售管理
+    keywords: [销售团队, 销售管理, 业绩指标, 大客户销售, 渠道销售, 市场拓展, 销售策略]
+  - dimension: 财务管理
+    keywords: [财务报表, 会计核算, 预算管理, 成本控制, 税务筹划, 审计, 资金管理]
+  - dimension: 目标与执行
+    keywords: [目标拆解, 目标管理, 督办, 进度跟踪, 落地执行, 推动落地, 达成率]
+
+# 维度定义文本（供本地 embedding 分类器做语义匹配；关键词兜底时忽略）
+dimension_definitions:
+  战略能力: "公司战略拆解、经营分析、决策支持、战略规划"
+  目标与绩效管理: "OKR/KPI 绩效管理、目标拆解与考核"
+  组织能力_体系搭建: "组织架构、职级体系、人才盘点、制度流程体系建设"
+  招聘与配置: "招聘全流程、简历筛选、面试、定岗定编"
+  薪酬福利: "薪酬核算、社保公积金、福利管理"
+  组织能力_人才发展: "培训、团建、企业文化、人才发展"
+  数据能力: "数据分析、数据看板、报表、BI、数据驱动决策"
+  AI与自动化: "AI 应用、自动化、RPA、智能体、大模型、数字化工具"
+  飞书生态: "飞书、多维表格、审批、OKR 等协同办公工具"
+  项目与流程管理: "项目管理、流程优化、跨部门协调沟通"
+  助理职能: "会议管理、日程安排、文件起草、商务接待、汇报纪要"
+  员工关系: "劳动关系、员工关系、入转调离、用工风险"
+
+# ── 硬过滤（一票否决）────────────────────────────────────
+hard_filters:
+  salary_no_overlap: true          # JD 薪资与期望完全不重叠 -> low
+  city_mismatch: true              # 非期望城市且非远程 -> low
+  exclude_titles: true             # 命中排除岗位关键词 -> low
+  english_required_phrases:        # JD 英语要求短语 -> 推导要求等级
+    L3: [精通, 工作语言, 可作为工作语言, 听说读写, 母语, 书面英语能力]
+    L2: [读写流利, 流利读写, 英语良好, 英语熟练]
+  other_language:                  # 其他语种高要求且候选人无对应能力 -> low
+    patterns:
+      - {lang: 日语, strong: [N1, 精通, 流利], level: 3}
+      - {lang: 韩语, strong: [TOPIK6, 精通, 流利], level: 3}
+  insurance_marketing:             # 保险营销疑似岗
+    jd_len_max: 160
+    city_contains: ["陆家嘴"]
+    salary_min_k: 18
+  zombie_title_keywords: ["双休", "外企", "可跨行", "接受跨行", "急招", "管理职", "无经验"]
+  zombie_title_min_hits: 2         # 标题命中 >= 2 个 -> low
+  zombie_empty_highpay:
+    jd_len_max: 200
+    salary_min_k: 18
+  zombie_shell:
+    company_keywords: ["企业管理", "人力", "企业咨询", "劳务派遣", "人才服务"]
+    title_keywords: ["双休", "外企"]
+    jd_len_max: 300
+  education_required_levels: ["硕士", "MBA", "博士"]   # 候选人本科 -> low（仅当为硬性要求）
+  education_required_regex: "学历要求[:：]?(硕士|MBA|博士)|(硕士|MBA|博士)及以上"
+  # 实习生/日薪岗检测
+  intern_patterns:
+    - 实习
+    - 实习生
+    - 实习岗
+    - 日薪
+    - 日结
+    - 日结周结
+    - 周结
+    - 27届
+    - 26届
+    - 25届
+  # 英语要求检测（在标题+描述中）  # 使用简单关键词匹配
+  english_required_keywords:
+    - 英语工作语言
+    - 英语作为工作语言
+    - 英语可作为工作语言
+    - 英语流利
+    - 英语读写
+    - 英语四级
+    - 英语六级
+    - 英文流利
+    - 英文书面
+    - English fluent
+    - fluent English
+    - 英语必须
+    - 英语要求
+    - 英语听说
+    - 英文读写
+    - 英文邮件
+    - 英文会议
+    - 英文沟通
+    - 英文工作
+    - 全英文
+    - 英语熟练
+    - 英语良好
+    - 英文熟练
+    - 英文良好
+    - CET-4
+    - CET-6
+    - 英语四级以上
+    - 英语六级优先
+    - 英语水平
+    - 英语口语
+    - 英文商务
+    - 英文文书
+    - 英语能力
+    - 英文能力
+    - 英语作为工作语言
+    - 英文作为工作语言
+    - 英语书面及口语
+    - 英语书面沟通
+    - 英语口语流利
+    - 英语能流利交流
+  # 小语种要求检测
+  other_language_patterns:
+    - 日语
+    - 日语N
+    - 日文
+    - 韩语
+    - 法语
+    - 德语
+  # 专业资质检测
+  professional_cert_patterns:
+    - 法律.*执业
+    - 律师.*资格
+    - 司法.*考试
+    - CPA
+    - CFA
+    - 注册会计师
+    - 高级会计师
+    - 医师.*资格
+    - 护士执业
+    - 电气工程师
+    - 结构工程师
+    - 执业资格
+    - 职业资格
+    - 法律从业资格
+    - 律师资格
+
+# ── 叠加修正信号 ────────────────────────────────────────
+override_signals:
+  salary_severe:
+    desc: "薪资严重不足：JD 最高 < 期望最低 × 90%"
+    effect: down1
+  overqualify:
+    desc: "能力严重超配：平均深度差 >= 2 级"
+    effect: down1
+  exp_mismatch:
+    desc: "经验严重错配：JD 上限 × 2 < 候选人实际年限"
+    effect: down1
+  ai_boost:
+    desc: "title 含 AI 关键词 -> 升 1 级"
+    scope: title
+    effect: up1
+
+ai_keywords:
+  - ai
+  - aigc
+  - 人工智能
+  - 智能体
+  - 大模型
+  - 机器学习
+  - 深度学习
+  - 算法
+  - chatgpt
+  - gpt
+  - llm
+  - nlp
+  - 自然语言处理
+  - agent
+  - 数字化
+  - 自动化
+  - rpa
+  - 智能化
+
+# ── 二次复核规则（仅 high/medium 触发）─────────────────
+review_rules:
+  A1:
+    desc: "岗位级别错配：非助理岗"
+    titles: ["CEO", "总裁", "GM", "总经理", "General Manager", "Chief Executive"]
+    exclude: ["助理", "秘书", "助手", "PA", "Executive Assistant"]
+  B3:
+    desc: "JD 内容空泛：万能模板无实质业务"
+    jd_len_max: 200
+    universal_phrases:
+      - "协助管理层处理日常事务"
+      - "会议安排、文件整理"
+      - "跨部门沟通协调"
+      - "完成上级交办的其他事项"
+    min_universal_hits: 3
+    need_no_business_scene: true
+  F1:
+    desc: "专业资质不符"
+    certs: ["法律从业资格", "律师资格", "司法考试", "CPA", "CFA", "注册会计师", "高级会计师", "医师资格", "护士执业", "电气工程师", "结构工程师"]
+  F3:
+    desc: "行业经验不符（要求深度行业经验且候选人无背景）"
+    industries: ["纺织", "面料", "服装制造", "机器视觉", "光学", "脑机接口", "神经科学", "酒店", "餐饮", "医美", "芯片", "半导体制造", "船舶", "航运"]
+    min_years: 3
+
+# ── 理由生成 ────────────────────────────────────────────
+reason:
+  max_len: 30
+  template: "匹配度{ pct }%，{ core }，{ extra }"
