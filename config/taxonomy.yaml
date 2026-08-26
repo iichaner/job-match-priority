@@ -1,0 +1,177 @@
+# =============================================================
+# taxonomy.yaml —— 语义映射的"结构化规则源"
+# -------------------------------------------------------------
+# 这是把"JD 自由文本 → 候选人能力维度"的语义推理，
+# 固化成一份人可编辑、机可执行的规则文件。
+#
+# 每个维度(ability dimension)都包含：
+#   id          : 稳定主键（候选人与 JD 都引用它）
+#   name        : 中文名
+#   weight      : 评分权重（原 skill 的加权算术）
+#   definition  : 维度定义（用于"定义增强"向量，提升召回）
+#   anchors     : 精选的 JD 表述范例（嵌入建索引，retrieval 的"标准答案"）
+#   lexicon     : 精确关键词（词典兜底，混合检索用）
+#   depth_verbs : 本维度内的"动词→深度"规则（原 skill 的动词驱动深度）
+#   negatives   : 反例锚点（对比学习，抑制跨维度误判）
+# =============================================================
+
+semantic:
+  top_k: 5                # 检索返回候选维度数
+  theta_high: 0.62        # ≥此值 → 直接采纳（高置信）
+  theta_low: 0.45         # 此值~theta_high → 进融合/待审区
+  lexicon_boost: 0.12     # 嵌入与词典同时命中时的置信加成
+  use_reranker: false     # 是否启用本地交叉编码器精排（更准，更重）
+  reranker_model: "BAAI/bge-reranker-v2-m3"
+  embed_model: "BAAI/bge-small-zh-v1.5"
+
+dimensions:
+  - id: compensation
+    name: 薪酬核算
+    weight: 30
+    definition: 负责薪资计算、薪酬结构设计、薪酬数据分析与发放核对
+    anchors:
+      - 负责薪酬核算与薪资发放
+      - 设计优化薪酬体系与宽带薪酬
+      - 处理 payroll 与个税申报
+      - 搭建薪酬测算模型
+      - 核算月度工资与年终奖
+    lexicon: [薪酬, 薪资, 工资, 算薪, payroll, 薪带, 薪酬体系]
+    depth_verbs:
+      L4: [主导, 搭建, 设计, 规划, 制定, 重构]
+      L3: [负责, 独立, 管理, 统筹, 主导过]
+      L2: [协助, 支持, 参与, 处理, 核对]
+      L1: [了解, 熟悉, 接触]
+    negatives:
+      - 绩效考核方案设计与落地      # 属 performance，非 compensation
+
+  - id: performance
+    name: 绩效与激励
+    weight: 20
+    definition: 绩效考核方案设计、OKR/KPI 管理、激励与职级体系搭建
+    anchors:
+      - 设计并推行绩效考核方案
+      - 负责 OKR/KPI 的分解与复盘
+      - 搭建职级与激励体系
+      - 组织绩效面谈与改进
+    lexicon: [绩效, 考核, OKR, KPI, 激励, 职级, 评估]
+    depth_verbs:
+      L4: [设计, 搭建, 主导, 规划]
+      L3: [负责, 推行, 管理, 统筹]
+      L2: [协助, 参与, 支持]
+      L1: [了解, 熟悉]
+    negatives:
+      - 负责薪酬核算与发放          # 属 compensation
+
+  - id: social_insurance
+    name: 社保公积金
+    weight: 12
+    definition: 社保、公积金、个税的合规办理与基数管理
+    anchors:
+      - 办理社保公积金开户与增减员
+      - 管理社保基数与合规申报
+      - 处理个税与汇算清缴
+    lexicon: [社保, 公积金, 五险一金, 个税, 基数]
+    depth_verbs:
+      L4: [统筹, 设计, 主导]
+      L3: [负责, 独立, 管理]
+      L2: [办理, 处理, 协助]
+      L1: [了解, 熟悉]
+    negatives: []
+
+  - id: people_analytics
+    name: 人力资源数据分析
+    weight: 15
+    definition: 人力数据看板、离职率/人效分析、报表自动化
+    anchors:
+      - 搭建人力数据看板与报表
+      - 分析离职率与人效指标
+      - 用 Excel/BI 做人力测算
+    lexicon: [数据, 看板, 报表, 分析, BI, 测算, 人效]
+    depth_verbs:
+      L4: [搭建, 设计, 主导, 建模]
+      L3: [负责, 独立, 分析, 管理]
+      L2: [协助, 处理, 制作]
+      L1: [了解, 熟悉]
+    negatives:
+      - 负责薪酬核算与发放          # 属 compensation
+
+  - id: recruitment
+    name: 招聘
+    weight: 10
+    definition: 招聘渠道管理、面试甄选、人才库建设
+    anchors:
+      - 负责全渠道招聘与面试甄选
+      - 搭建人才库与雇主品牌
+      - 统筹校园招聘与社会招聘
+    lexicon: [招聘, 面试, 甄选, 猎头, 人才库, 雇主品牌]
+    depth_verbs:
+      L4: [统筹, 搭建, 主导, 规划]
+      L3: [负责, 管理, 独立]
+      L2: [协助, 参与, 支持]
+      L1: [了解, 熟悉]
+    negatives: []
+
+  - id: er
+    name: 员工关系
+    weight: 8
+    definition: 员工沟通、劳动关系、合规与活动组织
+    anchors:
+      - 处理员工关系与劳动争议
+      - 组织员工活动与企业文化
+      - 管理入离职与劳动关系合规
+    lexicon: [员工关系, 劳动, 争议, 入职, 离职, 文化, 活动]
+    depth_verbs:
+      L4: [主导, 设计, 统筹]
+      L3: [负责, 管理, 独立]
+      L2: [协助, 处理, 支持]
+      L1: [了解, 熟悉]
+    negatives: []
+
+  - id: strategy
+    name: 战略与组织
+    weight: 10
+    definition: 人力资源战略、组织发展、变革管理（高管向）
+    anchors:
+      - 制定人力资源战略与规划
+      - 主导组织变革与发展
+      - 搭建高管团队与决策支持
+    lexicon: [战略, 组织发展, 变革, OD, 高管, 规划]
+    depth_verbs:
+      L4: [制定, 主导, 规划, 搭建]
+      L3: [负责, 参与, 支持]
+      L2: [协助, 了解]
+      L1: [熟悉]
+    negatives:
+      - 负责薪酬核算与发放          # 非战略级
+
+  - id: admin
+    name: 行政与办公
+    weight: 5
+    definition: 会议日程、差旅、办公资产、前台类事务
+    anchors:
+      - 安排会议日程与差旅
+      - 管理办公资产与行政事务
+      - 协助高管日常行政
+    lexicon: [行政, 日程, 差旅, 会议, 资产, 办公]
+    depth_verbs:
+      L4: [统筹, 管理]
+      L3: [负责, 独立]
+      L2: [协助, 安排, 处理]
+      L1: [了解]
+    negatives: []
+
+  - id: english
+    name: 英语能力
+    weight: 6
+    definition: 英文邮件、会议、文档的读写能力
+    anchors:
+      - 英文邮件与会议沟通
+      - 英文报表与文档撰写
+      - 全英文工作环境协作
+    lexicon: [英语, 英文, English, 双语, CET]
+    depth_verbs:
+      L4: [主导, 全英文, 流利]
+      L3: [独立, 负责, 熟练]
+      L2: [协助, 读写]
+      L1: [了解, 基础]
+    negatives: []

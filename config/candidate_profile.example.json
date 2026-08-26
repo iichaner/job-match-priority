@@ -1,0 +1,27 @@
+{
+  "meta": {
+    "name": "候选人示例",
+    "target_titles": ["总助", "CEO助理", "HRBP"],
+    "expected_salary_min_k": 15,
+    "expected_salary_max_k": 20,
+    "preferred_cities": ["上海"],
+    "exclude_titles_keywords": ["纯销售", "电话销售"],
+    "target_roles": ["总助", "CEO助理", "HRBP", "人事", "行政"],
+    "education_max": "本科",
+    "total_years": 5,
+    "language_levels": { "英语": 1 },
+    "industry_experience": [
+      { "industry": "互联网", "years": 3, "roles": ["总助", "项目管理"] },
+      { "industry": "消费品", "years": 2, "roles": ["销售助理", "行政"] }
+    ],
+    "role_accumulation": { "总助": 3, "项目管理": 3, "销售助理": 2, "行政": 2 },
+    "hard_filter_industries": ["金融", "芯片"],
+    "no_certifications": ["证券从业", "CPA"]
+  },
+  "dimensions": {
+    "战略能力": 3, "目标与绩效管理": 3, "组织能力_体系搭建": 3,
+    "招聘与配置": 3, "薪酬福利": 3, "组织能力_人才发展": 3,
+    "数据能力": 3, "AI与自动化": 3, "飞书生态": 3,
+    "项目与流程管理": 3, "助理职能": 3, "员工关系": 3
+  }
+}
