@@ -5,10 +5,12 @@ run_match.py —— JD 批量匹配 CLI（零 LLM 调用）
 
 用法：
     python run_match.py \\
-        --profile candidate_profile.json \\
-        --config match_config.yaml \\
+        --profile-id ii \\
         --input jds.csv \\
         [--out result.csv] [--limit 20] [--embed]
+
+    或（旧用法，显式路径）：
+    python run_match.py --profile candidate_profile.json --config match_config.yaml --input jds.csv
 
 输入：CSV（utf-8-sig），至少含 岗位名称/公司名称/薪资范围/工作地点/JD描述 等列。
 输出：源文件全部列 + 追加 [优先级判断, 匹配度, 优先级判断理由, 能力条目得分, 深度匹配]，
@@ -20,12 +22,30 @@ run_match.py —— JD 批量匹配 CLI（零 LLM 调用）
 
 import argparse
 import csv
+import os
 import sys
 import yaml
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from matcher import load_profile, load_config, Matcher, enrich_jd
+
+
+def _pipeline_scripts_dir():
+    """定位 boss-pipeline/scripts（BOSS_PIPELINE_SKILLS_ROOT > 同级兄弟目录）
+
+    注意：这里刻意不写死任何家目录路径；找不到时提示用户设置环境变量。
+    """
+    cands = []
+    env = os.environ.get('BOSS_PIPELINE_SKILLS_ROOT')
+    if env:
+        cands.append(Path(env).expanduser() / 'boss-pipeline' / 'scripts')
+    for parent in Path(__file__).resolve().parents:
+        cands.append(parent / 'boss-pipeline' / 'scripts')
+    for c in cands:
+        if (c / 'config_paths.py').is_file():
+            return c
+    return None
 
 APPEND_COLS = ["优先级判断", "匹配度", "优先级判断理由", "能力条目得分", "叠加信号", "平均JD深度", "平均候选人深度"]
 
@@ -100,8 +120,10 @@ def decide_out_path(in_path):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--profile", required=True)
-    ap.add_argument("--config", required=True)
+    ap.add_argument("--profile", default=None, help="画像 JSON 路径（旧用法，与 --profile-id 二选一）")
+    ap.add_argument("--config", default=None, help="判定配置 YAML 路径（旧用法，与 --profile-id 二选一）")
+    ap.add_argument("--profile-id", default=None,
+                    help="从 ~/.boss-pipeline/profiles/<id>/ 读取画像与偏好（推荐）")
     ap.add_argument("--input", required=True)
     ap.add_argument("--out", default=None)
     ap.add_argument("--limit", type=int, default=0)
@@ -111,8 +133,29 @@ def main():
     ap.add_argument("--api-key", default=None, help="SiliconFlow API Key（或设环境变量 SILICONFLOW_API_KEY）")
     args = ap.parse_args()
 
-    profile = load_profile(args.profile)
-    config = load_config(args.config)
+    pipeline_cfg = None
+    if args.profile_id:
+        if args.profile or args.config:
+            ap.error("--profile-id 不能与 --profile/--config 同时使用")
+        scripts_dir = _pipeline_scripts_dir()
+        if scripts_dir is None:
+            ap.error("找不到 boss-pipeline/scripts（请设置 BOSS_PIPELINE_SKILLS_ROOT 为四个 skill 的父目录）")
+        if str(scripts_dir) not in sys.path:
+            sys.path.insert(0, str(scripts_dir))
+        try:
+            import config_paths
+            import profile_adapter
+        except Exception as e:
+            ap.error(f"加载 config_paths 失败：{e}")
+        pipeline_cfg = config_paths
+        profile = profile_adapter.to_legacy_profile(config_paths.load_profile(args.profile_id))
+        config = config_paths.effective_config(args.profile_id)
+        print(f"[profile] 使用画像 id={args.profile_id}（来自 ~/.boss-pipeline）")
+    else:
+        if not args.profile or not args.config:
+            ap.error("需要 --profile-id，或同时提供 --profile 与 --config")
+        profile = load_profile(args.profile)
+        config = load_config(args.config)
     embed = None
     light_embed = None
     api_embed = None
@@ -120,7 +163,8 @@ def main():
         try:
             from semantic_match_api import APISemanticMatcher
             import os
-            tx_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config/taxonomy.yaml")
+            tx_path = (str(pipeline_cfg.taxonomy_path(args.profile_id)) if pipeline_cfg else
+                       os.path.join(os.path.dirname(os.path.dirname(__file__)), "config/taxonomy.yaml"))
             # 优先级: 命令行参数 > 环境变量 > config.local.yaml
             api_key = args.api_key or os.environ.get("SILICONFLOW_API_KEY", "")
             if not api_key:
@@ -141,7 +185,8 @@ def main():
         try:
             from semantic_match_light import LightSemanticMatcher
             import os
-            tx_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config/taxonomy.yaml")
+            tx_path = (str(pipeline_cfg.taxonomy_path(args.profile_id)) if pipeline_cfg else
+                       os.path.join(os.path.dirname(os.path.dirname(__file__)), "config/taxonomy.yaml"))
             light_embed = LightSemanticMatcher(tx_path)
             light_embed.ensure_built()
             print("[light-embed] 轻量级语义匹配器就绪 (TF-IDF+FAISS)")
