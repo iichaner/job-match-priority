@@ -9,3 +9,6 @@ __pycache__/
 # 系统文件
 .DS_Store
 Thumbs.db
+
+# 个人画像不入公开仓库（每人一份，存 ~/.boss-pipeline/profiles/<id>/）
+config/candidate_profile.json
