@@ -12,3 +12,6 @@ Thumbs.db
 
 # 个人画像不入公开仓库（每人一份，存 ~/.boss-pipeline/profiles/<id>/）
 config/candidate_profile.json
+
+# 派生判定结果（含个人画像信息）永不入库
+*判定结果*.csv
